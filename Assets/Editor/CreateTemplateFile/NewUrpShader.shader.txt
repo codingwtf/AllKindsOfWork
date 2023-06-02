@@ -1,0 +1,91 @@
+Shader "Urp/#SCRIPTNAME#"
+{
+    Properties
+    {
+        _Color("Color(RGB)",Color) = (1,1,1,1)
+        _MainTex("MainTex",2D) = "gary"{}
+    }
+    SubShader
+    {
+        Tags
+        {
+
+            "RenderPipeline"="UniversalPipeline"
+            "RenderType"="Opaque"
+            "Queue"="Geometry+0"
+        }
+        
+        Pass
+        {
+            Name "Pass"
+            Tags 
+            { 
+                
+            }
+            
+            Cull Back
+            ZWrite On
+            
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+
+            #pragma multi_compile_instancing
+            
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            
+            CBUFFER_START(UnityPerMaterial)
+                half4 _Color;
+            CBUFFER_END
+            
+            // 纹理与采样器的分离定义:
+            // 采样器和纹理分开定义的好处是什么？
+            // 内置管线的纹理的定义是和采样器的定义绑定的，采样器的定义是有限制的。
+            // 在URP中纹理的定义和采样器的定义是分离的，假如声明了很多个纹理，可以都用这一个采样器
+            TEXTURE2D(_MainTex);//纹理的定义，如果是编译到GLES2.0平台，相当于samler2D _MainTex;否则TEXTURE2D _MainTex
+            float4 _MainTex_ST;
+            // 采样器的定义(纹理与采样器分离定义),采样器是指纹理的过滤模式与重复模式,此功能在OpenGL ES2.0上不支持，相当于没写.
+            // 1.SAMPLER(sampler_textureName):sampler+纹理名称，这种定义形式是表示采用textureName这个纹理Inspector面板中的采样方式.
+            // 2.SAMPLER(_filter_wrap):比如SAMPLER(point_clamp),使用自定义的采样器设置，自定义的采样器一定要同时包含过滤模式<filter>与重复模式<wrap>的设置.
+            // 3.SAMPLER(_filter_wrapU_wrapV):比如SAMPLER(linear_clampU_mirrorV),可同时设置重复模式的U与V的不同值.
+            // 4.filter:point/linear/triLinear
+            // 5.wrap:clamp/repeat/mirror/mirrorOnce
+            
+            //为了方便操作 定义预定义
+            #define smp SamplerState_Linear_Repeat
+            // SAMPLER(sampler_MainTex); 默认采样器
+            SAMPLER(smp);
+            
+            struct Attributes
+            {
+                float3 positionOS : POSITION;
+                float2 uv :TEXCOORD0;
+            };
+            
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv :TEXCOORD0;
+
+            };
+            
+            
+            Varyings vert(Attributes v)
+            {
+                Varyings o = (Varyings)0;
+                o.uv = TRANSFORM_TEX(v.uv,_MainTex);
+                o.positionCS = TransformObjectToHClip(v.positionOS);
+                return o;
+            }
+
+            half4 frag(Varyings i) : SV_TARGET 
+            {    
+                half4 mainTex = SAMPLE_TEXTURE2D(_MainTex,smp,i.uv);
+                half4 c = _Color * mainTex;
+                return c;
+            }
+            
+            ENDHLSL
+        }
+    }
+}
